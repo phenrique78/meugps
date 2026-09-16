@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <!-- Importante para funcionar bem no celular -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Meu GPS</title>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .status {
+            text-align: center;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .dados {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .dado {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .valor {
+            font-weight: bold;
+        }
+
+        .botoes {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <h1>📍 Meu GPS</h1>
+
+
+    <div class="status">
+
+        Status:
+        <span id="status">
+            Parado
+        </span>
+
+    </div>
+
+
+    <div class="dados">
+
+        <div class="dado">
+            <span>Latitude:</span>
+            <span class="valor" id="latitude">--</span>
+        </div>
+
+        <div class="dado">
+            <span>Longitude:</span>
+            <span class="valor" id="longitude">--</span>
+        </div>
+
+        <div class="dado">
+            <span>Altitude:</span>
+            <span class="valor" id="altitude">--</span>
+        </div>
+
+        <div class="dado">
+            <span>Precisão:</span>
+            <span class="valor" id="precisao">--</span>
+        </div>
+
+        <div class="dado">
+            <span>Velocidade:</span>
+            <span class="valor" id="velocidade">--</span>
+        </div>
+
+        <div class="dado">
+            <span>Horário:</span>
+            <span class="valor" id="horario">--</span>
+        </div>
+
+        <div class="dado">
+            <span>Pontos coletados:</span>
+            <span class="valor" id="quantidade">0</span>
+        </div>
+
+    </div>
+
+
+    <div class="botoes">
+
+        <button
+            id="btnIniciar"
+            onclick="iniciarGPS()">
+            ▶️ Iniciar
+        </button>
+
+
+        <button
+            id="btnParar"
+            onclick="pararGPS()"
+            disabled>
+            ⏹️ Parar
+        </button>
+
+
+        <button
+            id="btnSalvar"
+            onclick="salvarCSV()"
+            disabled>
+            💾 Salvar CSV
+        </button>
+
+    </div>
+
+
+    <script>
+
+        // =====================================================
+        // VARIÁVEIS
+        // =====================================================
+
+        let gpsId = null;
+
+        let pontosGPS = [];
+
+
+        // =====================================================
+        // INICIAR GPS
+        // =====================================================
+
+        function iniciarGPS() {
+
+            // Verifica se o navegador possui suporte ao GPS
+
+            if (!navigator.geolocation) {
+
+                alert(
+                    "Seu navegador não suporta geolocalização."
+                );
+
+                return;
+            }
+
+
+            // Limpa os dados da atividade anterior
+
+            pontosGPS = [];
+
+
+            document.getElementById("quantidade").textContent = "0";
+
+
+            document.getElementById("status").textContent =
+                "Buscando localização...";
+
+
+            // Inicia o acompanhamento da localização
+
+            gpsId = navigator.geolocation.watchPosition(
+
+                atualizarGPS,
+
+                erroGPS,
+
+                {
+
+                    // Solicita maior precisão possível
+
+                    enableHighAccuracy: true,
+
+                    // Não utilizar uma localização antiga
+
+                    maximumAge: 0,
+
+                    // Tempo máximo para obter uma posição
+
+                    timeout: 10000
+
+                }
+
+            );
+
+
+            // Alterar estado dos botões
+
+            document.getElementById("btnIniciar").disabled = true;
+
+            document.getElementById("btnParar").disabled = false;
+
+            document.getElementById("btnSalvar").disabled = true;
+
+
+            document.getElementById("status").textContent =
+                "GPS ativo";
+
+        }
+
+
+        // =====================================================
+        // RECEBER NOVA POSIÇÃO
+        // =====================================================
+
+        function atualizarGPS(position) {
+
+
+            // ---------------------------------------------
+            // Dados fornecidos pelo GPS
+            // ---------------------------------------------
+
+            const latitude =
+                position.coords.latitude;
+
+
+            const longitude =
+                position.coords.longitude;
+
+
+            const altitude =
+                position.coords.altitude;
+
+
+            const precisao =
+                position.coords.accuracy;
+
+
+            const velocidade =
+                position.coords.speed;
+
+
+            const timestamp =
+                position.timestamp;
+
+
+            // ---------------------------------------------
+            // Criar objeto com os dados
+            // ---------------------------------------------
+
+            const ponto = {
+
+                numero:
+                    pontosGPS.length + 1,
+
+                timestamp:
+                    new Date(timestamp).toISOString(),
+
+                latitude:
+                    latitude,
+
+                longitude:
+                    longitude,
+
+                altitude:
+                    altitude,
+
+                precisao:
+                    precisao,
+
+                velocidade:
+                    velocidade
+
+            };
+
+
+            // ---------------------------------------------
+            // Adicionar ponto à lista
+            // ---------------------------------------------
+
+            pontosGPS.push(ponto);
+
+
+            // ---------------------------------------------
+            // Atualizar tela
+            // ---------------------------------------------
+
+            document.getElementById("latitude").textContent =
+                latitude.toFixed(6);
+
+
+            document.getElementById("longitude").textContent =
+                longitude.toFixed(6);
+
+
+            // Altitude
+
+            if (altitude !== null) {
+
+                document.getElementById("altitude").textContent =
+                    altitude.toFixed(2) + " m";
+
+            } else {
+
+                document.getElementById("altitude").textContent =
+                    "Não disponível";
+
+            }
+
+
+            // Precisão
+
+            document.getElementById("precisao").textContent =
+                precisao.toFixed(2) + " m";
+
+
+            // Velocidade
+
+            if (velocidade !== null) {
+
+                const velocidadeKmh =
+                    velocidade * 3.6;
+
+
+                document.getElementById("velocidade").textContent =
+                    velocidadeKmh.toFixed(1) + " km/h";
+
+            } else {
+
+                document.getElementById("velocidade").textContent =
+                    "Não disponível";
+
+            }
+
+
+            // Horário
+
+            const horario =
+                new Date(timestamp);
+
+
+            document.getElementById("horario").textContent =
+                horario.toLocaleTimeString("pt-BR");
+
+
+            // Quantidade de pontos
+
+            document.getElementById("quantidade").textContent =
+                pontosGPS.length;
+
+
+            // Console para acompanhar os dados
+
+            console.log(ponto);
+
+        }
+
+
+        // =====================================================
+        // ERRO GPS
+        // =====================================================
+
+        function erroGPS(error) {
+
+            console.log("Erro GPS:", error);
+
+
+            let mensagem = "";
+
+
+            switch (error.code) {
+
+                case error.PERMISSION_DENIED:
+
+                    mensagem =
+                        "Permissão de localização negada.";
+
+                    break;
+
+
+                case error.POSITION_UNAVAILABLE:
+
+                    mensagem =
+                        "Localização indisponível.";
+
+                    break;
+
+
+                case error.TIMEOUT:
+
+                    mensagem =
+                        "Tempo limite para obter localização.";
+
+                    break;
+
+
+                default:
+
+                    mensagem =
+                        "Erro desconhecido ao obter localização.";
+
+            }
+
+
+            document.getElementById("status").textContent =
+                "Erro";
+
+
+            alert(mensagem);
+
+        }
+
+
+        // =====================================================
+        // PARAR GPS
+        // =====================================================
+
+        function pararGPS() {
+
+
+            if (gpsId !== null) {
+
+                navigator.geolocation.clearWatch(gpsId);
+
+                gpsId = null;
+
+            }
+
+
+            document.getElementById("status").textContent =
+                "Atividade finalizada";
+
+
+            document.getElementById("btnIniciar").disabled =
+                false;
+
+
+            document.getElementById("btnParar").disabled =
+                true;
+
+
+            // Só permite salvar se houver pontos
+
+            if (pontosGPS.length > 0) {
+
+                document.getElementById("btnSalvar").disabled =
+                    false;
+
+            }
+
+        }
+
+
+        // =====================================================
+        // SALVAR CSV
+        // =====================================================
+
+        function salvarCSV() {
+
+
+            if (pontosGPS.length === 0) {
+
+                alert(
+                    "Nenhum dado GPS foi registrado."
+                );
+
+                return;
+
+            }
+
+
+            // ---------------------------------------------
+            // Cabeçalho do CSV
+            // ---------------------------------------------
+
+            let csv =
+                "ponto,timestamp,latitude,longitude,altitude,precisao,velocidade\n";
+
+
+            // ---------------------------------------------
+            // Adicionar cada ponto
+            // ---------------------------------------------
+
+            pontosGPS.forEach(ponto => {
+
+
+                const altitude =
+                    ponto.altitude !== null
+                        ? ponto.altitude
+                        : "";
+
+
+                const velocidade =
+                    ponto.velocidade !== null
+                        ? ponto.velocidade
+                        : "";
+
+
+                csv +=
+                    `${ponto.numero},` +
+                    `${ponto.timestamp},` +
+                    `${ponto.latitude},` +
+                    `${ponto.longitude},` +
+                    `${altitude},` +
+                    `${ponto.precisao},` +
+                    `${velocidade}\n`;
+
+            });
+
+
+            // ---------------------------------------------
+            // Criar arquivo
+            // ---------------------------------------------
+
+            const arquivo =
+                new Blob(
+                    [csv],
+                    {
+                        type:
+                            "text/csv;charset=utf-8;"
+                    }
+                );
+
+
+            // Criar URL temporária
+
+            const url =
+                URL.createObjectURL(arquivo);
+
+
+            // Criar link para download
+
+            const link =
+                document.createElement("a");
+
+
+            link.href = url;
+
+
+            // Nome do arquivo
+
+            const agora =
+                new Date();
+
+
+            const nomeArquivo =
+                "atividade_" +
+                agora.getFullYear() +
+                "-" +
+                String(agora.getMonth() + 1).padStart(2, "0") +
+                "-" +
+                String(agora.getDate()).padStart(2, "0") +
+                "_" +
+                String(agora.getHours()).padStart(2, "0") +
+                "-" +
+                String(agora.getMinutes()).padStart(2, "0") +
+                ".csv";
+
+
+            link.download =
+                nomeArquivo;
+
+
+            // Executar download
+
+            link.click();
+
+
+            // Liberar memória
+
+            URL.revokeObjectURL(url);
+
+
+            alert(
+                "Atividade salva com sucesso!"
+            );
+
+        }
+
+    </script>
+
+</body>
+
+</html>
