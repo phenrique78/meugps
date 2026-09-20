@@ -579,37 +579,71 @@
     // SALVAR CSV
     // =====================================================
 
-    async function salvarCSV() {
+    function salvarCSV() {
 
-        if (pontosGPS.length === 0) {
-            alert("Nenhum dado GPS foi registrado.");
-            return;
-        }
+    if (pontosGPS.length === 0) {
+        alert("Nenhum dado GPS foi registrado.");
+        return;
+    }
 
-        // ---------------------------------------------
-        // Cabeçalho do CSV
-        // ---------------------------------------------
+    // Cabeçalho
+    let csv = "ponto,timestamp,latitude,longitude,altitude,precisao,velocidade\n";
 
-        let csv = "ponto,timestamp,latitude,longitude,altitude,precisao,velocidade\n";
+    // Dados
+    pontosGPS.forEach(ponto => {
 
-        // ---------------------------------------------
-        // Adicionar cada ponto
-        // ---------------------------------------------
+        const altitude = ponto.altitude !== null ? ponto.altitude : "";
+        const velocidade = ponto.velocidade !== null ? ponto.velocidade : "";
 
-        pontosGPS.forEach(ponto => {
+        csv +=
+            `${ponto.numero},` +
+            `${ponto.timestamp},` +
+            `${ponto.latitude},` +
+            `${ponto.longitude},` +
+            `${altitude},` +
+            `${ponto.precisao},` +
+            `${velocidade}\n`;
+    });
 
-            const altitude = ponto.altitude !== null ? ponto.altitude : "";
-            const velocidade = ponto.velocidade !== null ? ponto.velocidade : "";
+    // Nome do arquivo
+    const agora = new Date();
 
-            csv +=
-                `${ponto.numero},` +
-                `${ponto.timestamp},` +
-                `${ponto.latitude},` +
-                `${ponto.longitude},` +
-                `${altitude},` +
-                `${ponto.precisao},` +
-                `${velocidade}\n`;
-        });
+    const nomeArquivo =
+        "atividade_" +
+        agora.getFullYear() +
+        "-" +
+        String(agora.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(agora.getDate()).padStart(2, "0") +
+        "_" +
+        String(agora.getHours()).padStart(2, "0") +
+        "-" +
+        String(agora.getMinutes()).padStart(2, "0") +
+        ".csv";
+
+    // Criar arquivo
+    const blob = new Blob(
+        ["\uFEFF" + csv],
+        { type: "text/csv;charset=utf-8;" }
+    );
+
+    // Criar link temporário
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nomeArquivo;
+
+    // Simular clique
+    document.body.appendChild(link);
+    link.click();
+
+    // Limpar
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    alert("Atividade salva com sucesso!");
+}
 
         // ---------------------------------------------
         // Nome do arquivo
