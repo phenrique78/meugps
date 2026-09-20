@@ -644,47 +644,6 @@
 
     alert("Atividade salva com sucesso!");
 }
-
-        // ---------------------------------------------
-        // Nome do arquivo
-        // ---------------------------------------------
-
-        const agora = new Date();
-
-        const nomeArquivo =
-            "atividade_" +
-            agora.getFullYear() +
-            "-" +
-            String(agora.getMonth() + 1).padStart(2, "0") +
-            "-" +
-            String(agora.getDate()).padStart(2, "0") +
-            "_" +
-            String(agora.getHours()).padStart(2, "0") +
-            "-" +
-            String(agora.getMinutes()).padStart(2, "0") +
-            ".csv";
-
-        // ---------------------------------------------
-        // Salvar arquivo (via capacidade de download do viewer)
-        // ---------------------------------------------
-
-        try {
-            const downloads = (window.claude && typeof window.claude.use === "function")
-                ? await window.claude.use("downloads")
-                : null;
-
-            if (downloads) {
-                await downloads.save({ filename: nomeArquivo, data: csv });
-                alert("Atividade salva com sucesso!");
-            } else {
-                alert("O download de arquivos não está disponível nesta visualização.");
-            }
-        } catch (e) {
-            console.error(e);
-            alert("Não foi possível salvar o arquivo.");
-        }
-    }
-
   </script>
 
 </body>
