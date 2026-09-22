@@ -128,6 +128,12 @@
     animation: none;
   }
 
+  .led.pausado {
+    background: var(--yellow-dim);
+    box-shadow: 0 0 4px 1px rgba(244, 192, 47, 0.25);
+    animation: none;
+  }
+
   @keyframes pulse {
     0%, 100% { box-shadow: 0 0 6px 1px var(--yellow-glow); }
     50% { box-shadow: 0 0 12px 4px var(--yellow-glow); }
@@ -429,11 +435,30 @@
     border-color: var(--yellow);
   }
 
-  #btnParar:not(:disabled) {
+  #btnPausar:not(:disabled) {
     border-color: #4a4a4f;
   }
 
-  #btnParar:not(:disabled):hover {
+  #btnPausar:not(:disabled):hover {
+    background: var(--panel-2);
+    border-color: var(--gray);
+  }
+
+  #btnRetomar:not(:disabled) {
+    border-color: var(--yellow-dim);
+    color: var(--yellow);
+  }
+
+  #btnRetomar:not(:disabled):hover {
+    background: #201a0c;
+    border-color: var(--yellow);
+  }
+
+  #btnEncerrar:not(:disabled) {
+    border-color: #4a4a4f;
+  }
+
+  #btnEncerrar:not(:disabled):hover {
     background: var(--panel-2);
     border-color: var(--gray);
   }
@@ -580,6 +605,12 @@
       </div>
 
       <div class="painel-esq">
+        <span class="rotulo">Distância Percorrida</span>
+        <span class="valor-max" id="distanciaPercorrida">0.00</span>
+        <span class="unidade">KM</span>
+      </div>
+
+      <div class="painel-esq">
         <span class="rotulo">Tempo de Funcionamento</span>
         <span class="valor-max" id="tempoFuncionamento">00:00:00</span>
       </div>
@@ -646,10 +677,24 @@
     </button>
 
     <button
-        id="btnParar"
-        onclick="pararGPS()"
-        disabled>
-        ⏹ Parar
+        id="btnPausar"
+        onclick="pausarGPS()"
+        style="display: none;">
+        ⏸ Pausar
+    </button>
+
+    <button
+        id="btnRetomar"
+        onclick="retomarGPS()"
+        style="display: none;">
+        ▶ Retomar
+    </button>
+
+    <button
+        id="btnEncerrar"
+        onclick="encerrarAtividade()"
+        style="display: none;">
+        ⏹ Encerrar
     </button>
 
     <button
@@ -676,6 +721,29 @@
 
     const led = document.getElementById("led");
     const gauge = document.getElementById("gauge");
+    const btnIniciar = document.getElementById("btnIniciar");
+    const btnPausar = document.getElementById("btnPausar");
+    const btnRetomar = document.getElementById("btnRetomar");
+    const btnEncerrar = document.getElementById("btnEncerrar");
+    const btnSalvar = document.getElementById("btnSalvar");
+
+    // =====================================================
+    // CONTROLE DE ESTADO DOS BOTÕES
+    // =====================================================
+    // Estados possíveis: "parado", "rodando", "pausado", "finalizado"
+
+    function atualizarBotoes(estado) {
+        const mostrar = (el, condicao) => {
+            el.style.display = condicao ? "" : "none";
+        };
+
+        mostrar(btnIniciar, estado === "parado" || estado === "finalizado");
+        mostrar(btnPausar, estado === "rodando");
+        mostrar(btnRetomar, estado === "pausado");
+        mostrar(btnEncerrar, estado === "pausado");
+
+        btnSalvar.disabled = !(estado === "finalizado" && pontosGPS.length > 0);
+    }
     const velocidadeMaximaEl = document.getElementById("velocidadeMaxima");
     const toggle0100 = document.getElementById("toggle0100");
     const cronometro0100El = document.getElementById("cronometro0100");
@@ -687,7 +755,13 @@
     // Tempo de funcionamento
     const tempoFuncionamentoEl = document.getElementById("tempoFuncionamento");
     let tempoInicioMs = null;
+    let tempoAcumuladoMs = 0;
     let tempoIntervalId = null;
+
+    // Distância percorrida
+    const distanciaPercorridaEl = document.getElementById("distanciaPercorrida");
+    let distanciaTotalKm = 0;
+    let ultimoPontoDistancia = null;
 
     // Rastro do trajeto (fundo da tela)
     const trilhaLinhaEl = document.getElementById("trilhaLinha");
@@ -697,6 +771,48 @@
     function setGaugePct(kmh) {
         const pct = Math.max(0, Math.min(100, (kmh / VELOCIDADE_MAX) * 100));
         gauge.style.setProperty("--pct", pct.toFixed(1));
+    }
+
+    // =====================================================
+    // DISTÂNCIA PERCORRIDA
+    // =====================================================
+
+    // Fórmula de Haversine: distância em km entre duas coordenadas
+    function calcularDistanciaKm(lat1, lon1, lat2, lon2) {
+        const R = 6371; // raio médio da Terra em km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    function atualizarDistancia(lat, lon) {
+
+        if (ultimoPontoDistancia !== null) {
+            const distancia = calcularDistanciaKm(
+                ultimoPontoDistancia.lat,
+                ultimoPontoDistancia.lon,
+                lat,
+                lon
+            );
+
+            distanciaTotalKm += distancia;
+            distanciaPercorridaEl.textContent = distanciaTotalKm.toFixed(2);
+        }
+
+        ultimoPontoDistancia = { lat, lon };
+    }
+
+    function reiniciarDistancia() {
+        distanciaTotalKm = 0;
+        ultimoPontoDistancia = null;
+        distanciaPercorridaEl.textContent = "0.00";
     }
 
     // =====================================================
@@ -710,20 +826,40 @@
         return `${h}:${m}:${s}`;
     }
 
-    function iniciarTempoFuncionamento() {
-        tempoInicioMs = performance.now();
-        tempoFuncionamentoEl.textContent = "00:00:00";
-
-        clearInterval(tempoIntervalId);
-        tempoIntervalId = setInterval(() => {
-            const decorrido = (performance.now() - tempoInicioMs) / 1000;
-            tempoFuncionamentoEl.textContent = formatarTempo(decorrido);
-        }, 1000);
+    function formatarTempo(segundosTotais) {
+        const h = String(Math.floor(segundosTotais / 3600)).padStart(2, "0");
+        const m = String(Math.floor((segundosTotais % 3600) / 60)).padStart(2, "0");
+        const s = String(Math.floor(segundosTotais % 60)).padStart(2, "0");
+        return `${h}:${m}:${s}`;
     }
 
-    function pararTempoFuncionamento() {
+    function atualizarTempoDisplay() {
+        const decorridoMs = tempoAcumuladoMs + (performance.now() - tempoInicioMs);
+        tempoFuncionamentoEl.textContent = formatarTempo(decorridoMs / 1000);
+    }
+
+    function iniciarTempoFuncionamento() {
+        tempoAcumuladoMs = 0;
+        tempoFuncionamentoEl.textContent = "00:00:00";
+        tempoInicioMs = performance.now();
+
+        clearInterval(tempoIntervalId);
+        tempoIntervalId = setInterval(atualizarTempoDisplay, 1000);
+    }
+
+    function pausarTempoFuncionamento() {
+        if (tempoInicioMs !== null) {
+            tempoAcumuladoMs += performance.now() - tempoInicioMs;
+            tempoInicioMs = null;
+        }
         clearInterval(tempoIntervalId);
         tempoIntervalId = null;
+    }
+
+    function retomarTempoFuncionamento() {
+        tempoInicioMs = performance.now();
+        clearInterval(tempoIntervalId);
+        tempoIntervalId = setInterval(atualizarTempoDisplay, 1000);
     }
 
     // =====================================================
@@ -855,6 +991,7 @@
         velocidadeMaxima = 0;
         velocidadeMaximaEl.textContent = "0";
         reiniciarTrilha();
+        reiniciarDistancia();
         iniciarTempoFuncionamento();
 
         document.getElementById("quantidade").textContent = "0";
@@ -882,9 +1019,7 @@
 
         // Alterar estado dos botões
 
-        document.getElementById("btnIniciar").disabled = true;
-        document.getElementById("btnParar").disabled = false;
-        document.getElementById("btnSalvar").disabled = true;
+        atualizarBotoes("rodando");
 
         document.getElementById("status").textContent = "GPS ativo";
     }
@@ -916,6 +1051,9 @@
 
         // Atualizar o rastro do trajeto no fundo da tela
         atualizarTrilha(latitude, longitude);
+
+        // Atualizar a distância total percorrida
+        atualizarDistancia(latitude, longitude);
 
         // Atualizar tela
         document.getElementById("latitude").textContent = latitude.toFixed(6);
@@ -991,19 +1129,70 @@
         }
 
         document.getElementById("status").textContent = "Erro";
-        led.classList.remove("on");
+        led.classList.remove("on", "pausado");
         led.classList.add("erro");
+
+        if (gpsId !== null) {
+            navigator.geolocation.clearWatch(gpsId);
+            gpsId = null;
+        }
+
         cancelarContagem0100();
-        pararTempoFuncionamento();
+        pausarTempoFuncionamento();
+        atualizarBotoes("pausado");
+
         alert(mensagem);
     }
 
 
     // =====================================================
-    // PARAR GPS
+    // PAUSAR / RETOMAR / ENCERRAR
     // =====================================================
 
-    function pararGPS() {
+    function pausarGPS() {
+
+        if (gpsId !== null) {
+            navigator.geolocation.clearWatch(gpsId);
+            gpsId = null;
+        }
+
+        document.getElementById("status").textContent = "Pausado";
+        led.classList.remove("on", "erro");
+        led.classList.add("pausado");
+
+        cancelarContagem0100();
+        pausarTempoFuncionamento();
+
+        atualizarBotoes("pausado");
+    }
+
+    function retomarGPS() {
+
+        if (!navigator.geolocation) {
+            alert("Seu navegador não suporta geolocalização.");
+            return;
+        }
+
+        document.getElementById("status").textContent = "GPS ativo";
+        led.classList.remove("pausado", "erro");
+        led.classList.add("on");
+
+        gpsId = navigator.geolocation.watchPosition(
+            atualizarGPS,
+            erroGPS,
+            {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
+            }
+        );
+
+        retomarTempoFuncionamento();
+
+        atualizarBotoes("rodando");
+    }
+
+    function encerrarAtividade() {
 
         if (gpsId !== null) {
             navigator.geolocation.clearWatch(gpsId);
@@ -1011,18 +1200,11 @@
         }
 
         document.getElementById("status").textContent = "Atividade finalizada";
-        led.classList.remove("on");
-        led.classList.remove("erro");
+        led.classList.remove("on", "erro", "pausado");
         cancelarContagem0100();
-        pararTempoFuncionamento();
+        pausarTempoFuncionamento();
 
-        document.getElementById("btnIniciar").disabled = false;
-        document.getElementById("btnParar").disabled = true;
-
-        // Só permite salvar se houver pontos
-        if (pontosGPS.length > 0) {
-            document.getElementById("btnSalvar").disabled = false;
-        }
+        atualizarBotoes("finalizado");
     }
 
 
